@@ -1,146 +1,147 @@
-#include <stdlib.h>
 #include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include <pthread.h>
+#include <math.h>
+#include <stdbool.h>
 
-int dup = 0;
-// integer updates to 1 if there is a duplicate number in the col,row,subgrid.
-// 0 if there is no duplicate.
 
-// Checks for a duplicate number in the test array inserted. will update dup if there is one.
-void checkDuplicate(int array[]){
-	for(int i = 0; i < 9 && !dup; i++){
-		for(int j = i+1; j < 9 && !dup; j++){
-			if(array[i] == array[j]){
-				dup = 1;
-				break;
+
+
+int rank=9;
+int board[rank][rank];
+int colsum=0;
+int rowsum=0;
+bool Rvalid=true;
+bool Cvalid=true;
+int num;
+
+
+pthread_mutex_t mutex;
+
+void *read_file(void *arg){
+	pthread_mutex_lock(&mutex);
+	FILE *fp = fopen("Input.txt","r");
+	fseek (fp, 0L, SEEK_END); //move to the end of file
+	int size = ftell(fp); //get the size
+	fseek (fp, 0, SEEK_SET); //set back to beginning of the file
+	if (size == 0) {
+		printf ("Empty file");
+	} 	else {
+		for (int i=0; i<rank; i++) {
+			for (int j=0; j<rank; j++) {
+				fscanf(fp, "%d", &puzzle[i][j]);}
+		}
+	}
+		fclose(fp);
+		pthread_mutex_unlock(&mutex);
+}
+
+
+void *print_board(void *arg){
+	pthread_mutex_lock(&mutex);
+	for (int i=0; i<rank; i++) {
+		for (int j=0; j<rank; j++) {
+			if (board[i][j]!=NULL){
+			printf("%d", board[i][j]");}
+			else {
+				printf("-"); }
 			}
+			printf("\n");
 		}
+		pthread_mutex_unlock(&mutex);
 	}
+
+void *checkRowValid(void *arg){
+		pthread_mutex_lock(&mutex);
+
+		Rvalid=true;
+		for (int i=0; i<rank; i++) {
+			for (int j=0; j<rank; j++) {
+				if (board[i][j]!=NULL){
+				sumRow=board[i][j]+sumRow;
+		  	}
+				else {
+					sumRow=1+sumRow;
+				}
+				if (sumRow>9){
+					Rvalid=false;
+					break;
+				}
+
+				}
+			}
+			pthread_mutex_unlock(&mutex);
+
+	}
+
+	void *checkColValid(void *arg){
+		pthread_mutex_lock(&mutex);
+		Cvalid=true;
+
+		for (int i=0; i<rank; i++) {
+			for (int j=0; j<rank; j++) {
+				if (board[j][i]!=NULL){
+				sumCol=board[j][i]+sumCol;
+				}
+				else {
+					sumCol=1+sumCol;
+				}
+				if (sumCol>9){
+					Cvalid=false;
+					break;
+				}
+
+				}
+			}
+			pthread_mutex_unlock(&mutex);
+
+	}
+
+
+
+	bool isInRow(int num, int row){
+		for (int j=0; j<rank; j++) {
+			if (board[row][j]==num){
+				return true;
+			}
+
+	}
+	return false
 }
 
-// Creates a temporary arrays of the rows to be checked. Calls checkDuplicate and exits the thread.
-void* checkRows(void* arg)
-{
-	int *temp_pointer = (int*)arg;
-	int temp = *temp_pointer;
-	int tempArray[9];
-
-	tempArray[0] = temp;
-	for(int j = 1; j < 9; j++){
-		temp = *(++temp_pointer);
-		tempArray[j] = temp;
-	}
-
-	checkDuplicate(tempArray);
-	pthread_exit(0);
+bool isInCol(int num, int col){
+	for (int i=0; i<rank; i++) {
+		if (board[i][col]==num){
+			return true;
+		}
+}
+return false
 }
 
-// Creates a temporary arrays of the columns to be checked. Calls checkDuplicate and exits the thread.
-void* checkColumns(void* arg){
-	int *temp_pointer = (int*)arg;
-	int temp = *temp_pointer;
-	int tempArray[9];
+bool isInBox(int num, int rowPoint, int colPoint){
+	for (int i=0; i<3; i++) {
+		for (int j=0; j<3; j++) {
+			if (board[i+rowPoint][j+colPoint] == num) {
+				return true;
+			}
+}
+}
+return false;
 
-	tempArray[0] = temp;
-	for(int i = 1; i < 9; i++){
-		temp = *((9*i)+temp_pointer);
-		tempArray[i] = temp;
+bool duplicates(int num,int row, int col){
+	if (isInRow(num,row)==false&& isInCol(num,col)==false&& isInBox(num,row-row%3,col-col%3)){
+		return true;
+	} else {
+		return false;
 	}
 	
-	checkDuplicate(tempArray);
-	pthread_exit(0);
 }
 
-// Creates a temporary arrays of the subgrids to be checked. Calls checkDuplicate and exits the thread.
-void* checkSubgrids(void* arg){
-	int *temp_pointer = (int*)arg;
-	int temp = *temp_pointer;
-	int tempArray[9];
 
-	for(int i = 0; i < 3; i++){
-		for(int j = 0; j < 3; j++){
-			temp = *(temp_pointer++);
-			tempArray[j + 3*i] = temp;
-		}
-		for(int k = 0; k < 6; k++){
-			temp = *(++temp_pointer);
-		}
-	}
+main(){
 
-	checkDuplicate(tempArray);
-	pthread_exit(0);
-}
 
-// main function
-int main(void){
-	int sudoku[9][9]; // creates a 2D array for the sudoku matrix
-	FILE *fp;
-	int i, j;
-	
-	// open txt file and store the matrix in the sudoku array. Error checks file open functions
-	fp = fopen("puzzle2.txt", "r");
-	if(fp == NULL){
-		printf("Error opening file.\n");
-		exit(1);
-	}
-	for(i = 0; i < 9; i++){
-		for(j = 0; j < 9; j++){
-			fscanf(fp, "%d", &sudoku[i][j]);
-		}
-	}
-	fclose(fp); // close file
-	
-	// print aquires sudoku matrix in the terminal
-	printf("Here is your sudoku solution:\n");
-	for(i = 0; i < 9; i++){
-		for(j = 0; j < 9; j++){
-			printf("%d ", sudoku[i][j]);
-		}
-		printf("\n");
-	}
-	printf("Checking validity...\n");
-	
-	// Creates 9 threads to check each row in the sudoku array using checkRows function.
-	pthread_t rows[9];
-	for(int i = 0; i < 9; i++){
-		pthread_attr_t attr;
-		pthread_attr_init(&attr);
-		pthread_create(&rows[i], &attr, checkRows, sudoku[i]);
-	}
 
-	// Creates 9 threads to check each column in the sudoku array using checkColumns function.
-	pthread_t columns[9];
-	for(int i = 0; i < 9; i++){
-		pthread_attr_t attr;
-		pthread_attr_init(&attr);
-		pthread_create(&columns[i], &attr, checkColumns, sudoku[0]+i);
-	}
-	
-	// Creates 9 threads to check each subgrid in the sudoku array using checkSubgrids function.
-	pthread_t subgrids[9];
-	int k = 0;
-	for(int i = 0; i < 3; i++){
-		for(int j = 0; j < 3; j++){
-			pthread_attr_t attr;
-			pthread_attr_init(&attr);
-			pthread_create(&subgrids[k], &attr, checkSubgrids, sudoku[3*i]+3*j);
-			k++;
-		}
-	}
 
-	// performs a join of all 27 row, column, and subgrid threads
-	for(int i = 0; i < 9; i++){
-		pthread_join(rows[i], NULL);
-		pthread_join(columns[i], NULL);
-		pthread_join(subgrids[i], NULL);
-	}
-	
-	// prints invalid or valid depending on status of dup integer
-	if(dup == 0){
-		printf("Valid Solution.\n");
-	}
-	else{
-		printf("Invalid Solution.\n");
-	}
-	return 0;
 }
